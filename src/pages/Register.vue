@@ -1,45 +1,59 @@
 <script setup lang="ts">
 import { reactive } from 'vue'
 import { z } from 'zod'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
 import { useZodErrors } from '../composables/useZodErrors'
+import { useAuthStore } from '../stores/auth'
+
+const router = useRouter();
 
 const schema = z
   .object({
-    fullName: z.string().min(1, 'Full name is required'),
+    name: z.string().min(1, 'Name is required'),
     email: z.string().min(1, 'Email is required').email('Email must be valid'),
     password: z.string().min(1, 'Password is required'),
-    confirmPassword: z.string().min(1, 'Confirm password is required'),
+    passwordConfirmation: z.string().min(1, 'Confirm password is required'),
   })
-  .refine((data) => data.password === data.confirmPassword, {
+  .refine((data) => data.password === data.passwordConfirmation, {
     message: 'Passwords must match',
-    path: ['confirmPassword'],
+    path: ['passwordConfirmation'],
   })
 
 const form = reactive({
-  fullName: '',
+  name: '',
   email: '',
   password: '',
-  confirmPassword: '',
+  passwordConfirmation: '',
 })
 
 const { errors, clearErrors, assignErrors } = useZodErrors([
-  'fullName',
+  'name',
   'email',
   'password',
-  'confirmPassword',
+  'passwordConfirmation',
 ])
+const authStore = useAuthStore()
 
-const handleSubmit = () => {
+const handleSubmit = async () => {
   clearErrors()
 
   const result = schema.safeParse(form)
   if (!result.success) {
     assignErrors(result.error)
+    return
+  }
+
+  try {
+    await authStore.register(result.data)
+    router.push({ name: 'login' })
+  } catch (error) {
+    console.error(error)
   }
 }
 
-const validateField = (field: 'fullName' | 'email' | 'password' | 'confirmPassword') => {
+const validateField = (
+  field: 'name' | 'email' | 'password' | 'passwordConfirmation',
+) => {
   const result = schema.safeParse(form)
   if (result.success) {
     errors[field] = undefined
@@ -62,16 +76,16 @@ const validateField = (field: 'fullName' | 'email' | 'password' | 'confirmPasswo
 
     <form class="mt-8 flex flex-col gap-5" @submit.prevent="handleSubmit">
       <label class="flex flex-col gap-2 text-sm font-medium text-slate-700">
-        Full name
+        Name
         <input
-          v-model="form.fullName"
+          v-model="form.name"
           type="text"
           placeholder="Jordan Lee"
           class="h-11 rounded-xl border px-4 text-sm text-slate-900 outline-none transition focus:border-slate-900"
-          :class="errors.fullName ? 'border-rose-500' : 'border-slate-200'"
-          @blur="validateField('fullName')"
+          :class="errors.name ? 'border-rose-500' : 'border-slate-200'"
+          @blur="validateField('name')"
         />
-        <span v-if="errors.fullName" class="text-xs text-rose-500">{{ errors.fullName }}</span>
+        <span v-if="errors.name" class="text-xs text-rose-500">{{ errors.name }}</span>
       </label>
 
       <label class="flex flex-col gap-2 text-sm font-medium text-slate-700">
@@ -103,14 +117,14 @@ const validateField = (field: 'fullName' | 'email' | 'password' | 'confirmPasswo
       <label class="flex flex-col gap-2 text-sm font-medium text-slate-700">
         Confirm password
         <input
-          v-model="form.confirmPassword"
+          v-model="form.passwordConfirmation"
           type="password"
           placeholder="Confirm your password"
           class="h-11 rounded-xl border px-4 text-sm text-slate-900 outline-none transition focus:border-slate-900"
-          :class="errors.confirmPassword ? 'border-rose-500' : 'border-slate-200'"
-          @blur="validateField('confirmPassword')"
+          :class="errors.passwordConfirmation ? 'border-rose-500' : 'border-slate-200'"
+          @blur="validateField('passwordConfirmation')"
         />
-        <span v-if="errors.confirmPassword" class="text-xs text-rose-500">{{ errors.confirmPassword }}</span>
+        <span v-if="errors.passwordConfirmation" class="text-xs text-rose-500">{{ errors.passwordConfirmation }}</span>
       </label>
 
       <button
@@ -119,11 +133,14 @@ const validateField = (field: 'fullName' | 'email' | 'password' | 'confirmPasswo
       >
         Create account
       </button>
+      <p v-if="authStore.error" class="text-center text-xs text-rose-500">
+        {{ authStore.error }}
+      </p>
     </form>
 
     <p class="mt-6 text-center text-sm text-slate-500">
       Already have an account?
-      <RouterLink to="/login" class="font-medium text-slate-700 hover:text-slate-900">
+      <RouterLink :to="{ name: 'login' }" class="font-medium text-slate-700 hover:text-slate-900">
         Login
       </RouterLink>
     </p>

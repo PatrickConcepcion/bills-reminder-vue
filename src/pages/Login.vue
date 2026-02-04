@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { reactive } from 'vue'
 import { z } from 'zod'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
 import { useZodErrors } from '../composables/useZodErrors'
+import { useAuthStore } from '../stores/auth'
+
+const router = useRouter()
 
 const schema = z.object({
   email: z.string().min(1, 'Email is required').email('Email must be valid'),
@@ -15,13 +18,21 @@ const form = reactive({
 })
 
 const { errors, clearErrors, assignErrors } = useZodErrors(['email', 'password'])
+const authStore = useAuthStore()
 
-const handleSubmit = () => {
+const handleSubmit = async () => {
   clearErrors()
 
   const result = schema.safeParse(form)
   if (!result.success) {
     assignErrors(result.error)
+    return
+  }
+  try {
+    await authStore.login(result.data)
+    router.push({ name: 'dashboard' })
+  } catch (error) {
+    console.error(error)
   }
 }
 
@@ -79,11 +90,14 @@ const validateField = (field: 'email' | 'password') => {
       >
         Log in
       </button>
+      <p v-if="authStore.error" class="text-center text-xs text-rose-500">
+        {{ authStore.error }}
+      </p>
     </form>
 
     <p class="mt-6 text-center text-sm text-slate-500">
       No account yet?
-      <RouterLink to="/register" class="font-medium text-slate-700 hover:text-slate-900">
+      <RouterLink :to="{ name: 'register' }" class="font-medium text-slate-700 hover:text-slate-900">
         Register
       </RouterLink>
     </p>
