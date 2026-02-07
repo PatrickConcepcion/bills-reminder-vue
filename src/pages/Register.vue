@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { RouterLink, useRouter } from 'vue-router'
 import { useZodErrors } from '../composables/useZodErrors'
 import { useAuthStore } from '../stores/auth'
+import type { ApiError } from '../types/api-error'
 
 const router = useRouter();
 
@@ -26,7 +27,7 @@ const form = reactive({
   passwordConfirmation: '',
 })
 
-const { errors, clearErrors, assignErrors } = useZodErrors([
+const { errors, clearErrors, assignErrors, assignApiErrors } = useZodErrors([
   'name',
   'email',
   'password',
@@ -47,7 +48,10 @@ const handleSubmit = async () => {
     await authStore.register(result.data)
     router.push({ name: 'login' })
   } catch (error) {
-    console.error(error)
+    const hasFieldErrors = assignApiErrors(error as ApiError)
+    if (hasFieldErrors) {
+      authStore.error = null
+    }
   }
 }
 
