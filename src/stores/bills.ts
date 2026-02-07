@@ -25,19 +25,27 @@ export const useBillStore = defineStore('bills', () => {
     hasNextPage: false,
     hasPrevPage: false,
   })
+  let latestFetchRequestId = 0
 
   const fetchBills = async (options?: { status?: BillStatus; page?: number; limit?: number }) => {
+    const requestId = ++latestFetchRequestId
     isLoading.value = true
-    error.value = null
 
     const nextStatus = options?.status ?? currentStatus.value
     const nextPage = options?.page ?? currentPage.value
     const nextLimit = options?.limit ?? pageSize.value
 
+    error.value = null
+
     try {
       const res = await api.get('/bills', {
         params: { status: nextStatus, limit: nextLimit, page: nextPage },
       })
+
+      if (requestId !== latestFetchRequestId) {
+        return res.data
+      }
+
       bills.value = res.data.bills
       currentStatus.value = nextStatus
       pagination.value = res.data.pagination
@@ -45,11 +53,17 @@ export const useBillStore = defineStore('bills', () => {
       pageSize.value = res.data.pagination.limit
       return res.data
     } catch (err) {
+      if (requestId !== latestFetchRequestId) {
+        return null
+      }
+
       const apiError = err as ApiError
       error.value = apiError.response?.data?.message ?? apiError.message ?? 'Failed to fetch bills'
-      throw err
+      return null
     } finally {
-      isLoading.value = false
+      if (requestId === latestFetchRequestId) {
+        isLoading.value = false
+      }
     }
   }
 

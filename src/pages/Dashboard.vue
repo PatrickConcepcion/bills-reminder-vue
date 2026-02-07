@@ -119,23 +119,6 @@ const tabs: { key: BillStatus; label: string; color: 'rose' | 'blue' | 'emerald'
           </button>
         </div>
 
-        <div class="mb-4 flex justify-end">
-          <div class="flex items-center gap-3">
-            <label for="page-size" class="text-sm text-slate-500">Per page</label>
-            <select
-              id="page-size"
-              class="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-700 outline-none transition focus:border-slate-900"
-              :value="store.pageSize"
-              :disabled="store.isLoading"
-              @change="handlePageSizeChange"
-            >
-              <option :value="6">6</option>
-              <option :value="12">12</option>
-              <option :value="24">24</option>
-            </select>
-          </div>
-        </div>
-
         <p v-if="store.error" class="mb-4 text-sm text-rose-600">{{ store.error }}</p>
 
         <div class="rounded-2xl bg-white p-4 shadow-sm sm:p-6">
