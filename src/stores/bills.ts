@@ -1,25 +1,69 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
 import api from '../lib/axios'
-import type { Bill, CreateBillPayload, UpdateBillPayload } from '../types/bills'
+import type {
+  Bill,
+  BillsPagination,
+  BillStatus,
+  CreateBillPayload,
+  UpdateBillPayload,
+} from '../types/bills'
 import type { ApiError } from '../types/api-error'
 
 export const useBillStore = defineStore('bills', () => {
   const bills = ref<Bill[]>([])
   const isLoading = ref(false)
   const error = ref<string | null>(null)
+  const currentStatus = ref<BillStatus>('upcoming')
+  const pageSize = ref(12)
+  const currentPage = ref(1)
+  const pagination = ref<BillsPagination>({
+    page: 1,
+    limit: 12,
+    total: 0,
+    totalPages: 1,
+    hasNextPage: false,
+    hasPrevPage: false,
+  })
+  let latestFetchRequestId = 0
 
-  const fetchBills = async () => {
+  const fetchBills = async (options?: { status?: BillStatus; page?: number; limit?: number }) => {
+    const requestId = ++latestFetchRequestId
     isLoading.value = true
+
+    const nextStatus = options?.status ?? currentStatus.value
+    const nextPage = options?.page ?? currentPage.value
+    const nextLimit = options?.limit ?? pageSize.value
+
     error.value = null
+
     try {
-      const res = await api.get('/bills')
+      const res = await api.get('/bills', {
+        params: { status: nextStatus, limit: nextLimit, page: nextPage },
+      })
+
+      if (requestId !== latestFetchRequestId) {
+        return res.data
+      }
+
       bills.value = res.data.bills
+      currentStatus.value = nextStatus
+      pagination.value = res.data.pagination
+      currentPage.value = res.data.pagination.page
+      pageSize.value = res.data.pagination.limit
+      return res.data
     } catch (err) {
+      if (requestId !== latestFetchRequestId) {
+        return null
+      }
+
       const apiError = err as ApiError
       error.value = apiError.response?.data?.message ?? apiError.message ?? 'Failed to fetch bills'
+      return null
     } finally {
-      isLoading.value = false
+      if (requestId === latestFetchRequestId) {
+        isLoading.value = false
+      }
     }
   }
 
@@ -28,7 +72,6 @@ export const useBillStore = defineStore('bills', () => {
     error.value = null
     try {
       const res = await api.post('/bills', payload)
-      bills.value.push(res.data.bill)
       return res.data.bill
     } catch (err) {
       const apiError = err as ApiError
@@ -92,6 +135,10 @@ export const useBillStore = defineStore('bills', () => {
     bills,
     isLoading,
     error,
+    currentStatus,
+    currentPage,
+    pageSize,
+    pagination,
     fetchBills,
     createBill,
     updateBill,

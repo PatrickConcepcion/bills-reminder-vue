@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useBillStore } from '../stores/bills'
-import type { Bill } from '../types/bills'
-import { bucketBills } from '../utils/billBuckets'
+import type { Bill, BillStatus } from '../types/bills'
 import Header from '../components/Header.vue'
 import BillList from '../components/BillList.vue'
 import CreateUpdateModal from '../components/CreateUpdateModal.vue'
@@ -11,12 +10,10 @@ import ConfirmationModal from '../components/ConfirmationModal.vue'
 const store = useBillStore()
 
 onMounted(() => {
-  store.fetchBills()
+  void store.fetchBills({ status: activeTab.value, page: 1 })
 })
 
-// Tab state
-type TabType = 'overdue' | 'upcoming' | 'paid'
-const activeTab = ref<TabType>('upcoming')
+const activeTab = ref<BillStatus>('upcoming')
 
 // Modals state
 const isCreateUpdateModalOpen = ref(false)
@@ -41,6 +38,7 @@ const openDeleteModal = (bill: Bill) => {
 const handleDeleteConfirm = async () => {
   if (selectedBill.value) {
     await store.deleteBill(selectedBill.value.id)
+    await store.fetchBills({ status: activeTab.value, page: store.currentPage })
     isDeleteModalOpen.value = false
     selectedBill.value = null
   }
@@ -48,42 +46,32 @@ const handleDeleteConfirm = async () => {
 
 const handleMarkAsPaid = async (bill: Bill) => {
   await store.payBill(bill.id)
-  await store.fetchBills()
+  await store.fetchBills({ status: activeTab.value, page: store.currentPage })
 }
 
-const billBuckets = computed(() => bucketBills(store.bills))
+const handleTabChange = async (tab: BillStatus) => {
+  activeTab.value = tab
+  await store.fetchBills({ status: tab, page: 1 })
+}
 
-// Lists
-const overdueBills = computed(() => {
-  return billBuckets.value.overdue
-})
+const handlePageChange = async (nextPage: number) => {
+  if (nextPage < 1 || nextPage > store.pagination.totalPages) return
+  await store.fetchBills({ status: activeTab.value, page: nextPage })
+}
 
-const upcomingBills = computed(() => {
-  return billBuckets.value.upcoming
-})
+const handlePageSizeChange = async (event: Event) => {
+  const target = event.target as HTMLSelectElement
+  const nextLimit = Number(target.value)
+  if (!Number.isFinite(nextLimit) || nextLimit < 1) return
 
-const paidBills = computed(() => {
-  return billBuckets.value.paid
-})
+  await store.fetchBills({ status: activeTab.value, page: 1, limit: nextLimit })
+}
 
-const currentBills = computed(() => {
-  switch (activeTab.value) {
-    case 'overdue':
-      return overdueBills.value
-    case 'upcoming':
-      return upcomingBills.value
-    case 'paid':
-      return paidBills.value
-    default:
-      return []
-  }
-})
-
-const tabs = computed(() => [
-  { key: 'overdue', label: 'Overdue', count: overdueBills.value.length, color: 'rose' },
-  { key: 'upcoming', label: 'Upcoming', count: upcomingBills.value.length, color: 'blue' },
-  { key: 'paid', label: 'Paid', count: paidBills.value.length, color: 'emerald' },
-])
+const tabs: { key: BillStatus; label: string; color: 'rose' | 'blue' | 'emerald' }[] = [
+  { key: 'overdue', label: 'Overdue', color: 'rose' },
+  { key: 'upcoming', label: 'Upcoming', color: 'blue' },
+  { key: 'paid', label: 'Paid', color: 'emerald' },
+]
 </script>
 
 <template>
@@ -111,43 +99,85 @@ const tabs = computed(() => [
           <button
             v-for="tab in tabs"
             :key="tab.key"
-            @click="activeTab = tab.key as TabType"
+            @click="handleTabChange(tab.key)"
             class="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition"
             :class="
               activeTab === tab.key
                 ? 'bg-white text-slate-900 shadow-sm'
                 : 'text-slate-500 hover:bg-white/50 hover:text-slate-700'
             "
-          >
-            {{ tab.label }}
-            <span
-              class="rounded-full px-2 py-0.5 text-xs font-semibold"
-              :class="{
-                'bg-rose-100 text-rose-700': tab.color === 'rose',
-                'bg-blue-100 text-blue-700': tab.color === 'blue',
-                'bg-emerald-100 text-emerald-700': tab.color === 'emerald',
-              }"
             >
-              {{ tab.count }}
-            </span>
+              {{ tab.label }}
+            <span
+              class="h-2 w-2 rounded-full"
+              :class="{
+                'bg-rose-500': tab.color === 'rose',
+                'bg-blue-500': tab.color === 'blue',
+                'bg-emerald-500': tab.color === 'emerald',
+              }"
+            />
           </button>
         </div>
 
-        <!-- Bill List -->
-        <div class="rounded-2xl bg-white shadow-sm">
+        <p v-if="store.error" class="mb-4 text-sm text-rose-600">{{ store.error }}</p>
+
+        <div class="rounded-2xl bg-white p-4 shadow-sm sm:p-6">
           <BillList
-            :bills="currentBills"
+            :bills="store.bills"
+            :is-loading="store.isLoading"
             :readonly="activeTab === 'paid'"
             @edit="openEditModal"
             @delete="openDeleteModal"
             @pay="handleMarkAsPaid"
           />
+
+          <div class="mt-6 flex items-center justify-between gap-4 border-t border-slate-100 pt-4">
+            <div class="flex items-center gap-2">
+              <button
+                class="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                :disabled="!store.pagination.hasPrevPage || store.isLoading"
+                @click="handlePageChange(store.pagination.page - 1)"
+              >
+                ← Prev
+              </button>
+              <p class="text-sm text-slate-500">
+                Page {{ store.pagination.page }} of {{ store.pagination.totalPages }}
+              </p>
+              <button
+                class="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                :disabled="!store.pagination.hasNextPage || store.isLoading"
+                @click="handlePageChange(store.pagination.page + 1)"
+              >
+                Next →
+              </button>
+            </div>
+
+            <div class="flex items-center gap-3">
+              <label for="page-size" class="text-sm text-slate-500">Per page</label>
+              <select
+                id="page-size"
+                class="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-700 outline-none transition focus:border-slate-900"
+                :value="store.pageSize"
+                :disabled="store.isLoading"
+                @change="handlePageSizeChange"
+              >
+                <option :value="6">6</option>
+                <option :value="12">12</option>
+                <option :value="24">24</option>
+              </select>
+            </div>
+          </div>
         </div>
       </div>
     </main>
 
     <!-- Modals -->
-    <CreateUpdateModal :is-open="isCreateUpdateModalOpen" :bill="selectedBill" @close="isCreateUpdateModalOpen = false" />
+    <CreateUpdateModal
+      :is-open="isCreateUpdateModalOpen"
+      :bill="selectedBill"
+      @save="store.fetchBills({ status: activeTab, page: 1 })"
+      @close="isCreateUpdateModalOpen = false"
+    />
 
     <ConfirmationModal
       :is-open="isDeleteModalOpen"

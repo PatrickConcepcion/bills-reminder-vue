@@ -1,4 +1,5 @@
 export type Frequency = 'MONTHLY' | 'WEEKLY' | 'YEARLY'
+export type BillStatus = 'overdue' | 'upcoming' | 'paid'
 
 export interface Bill {
   id: string
@@ -27,3 +28,12 @@ export type CreateBillPayload = {
 }
 
 export type UpdateBillPayload = CreateBillPayload
+
+export type BillsPagination = {
+  page: number
+  limit: number
+  total: number
+  totalPages: number
+  hasNextPage: boolean
+  hasPrevPage: boolean
+}
