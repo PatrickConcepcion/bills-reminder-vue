@@ -15,12 +15,13 @@ type RetriableRequestConfig = InternalAxiosRequestConfig & {
 }
 
 const normalizeRequestPath = (requestUrl?: string) => {
-  if (!requestUrl) return ''
+  const sanitizedUrl = requestUrl ?? ''
+  if (!sanitizedUrl) return ''
 
   try {
-    return new URL(requestUrl, import.meta.env.VITE_API_BASE_URL).pathname.replace(/\/+$/, '')
+    return new URL(sanitizedUrl, import.meta.env.VITE_API_BASE_URL).pathname.replace(/\/+$/, '')
   } catch {
-    return requestUrl.split('?')[0].split('#')[0].replace(/\/+$/, '')
+    return sanitizedUrl.replace(/[?#].*$/, '').replace(/\/+$/, '')
   }
 }
 
