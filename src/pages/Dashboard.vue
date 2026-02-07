@@ -2,6 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useBillStore } from '../stores/bills'
 import type { Bill } from '../types/bills'
+import { bucketBills } from '../utils/billBuckets'
 import Header from '../components/Header.vue'
 import BillList from '../components/BillList.vue'
 import CreateUpdateModal from '../components/CreateUpdateModal.vue'
@@ -50,21 +51,19 @@ const handleMarkAsPaid = async (bill: Bill) => {
   await store.fetchBills()
 }
 
+const billBuckets = computed(() => bucketBills(store.bills))
+
 // Lists
 const overdueBills = computed(() => {
-  const now = new Date()
-  now.setHours(0, 0, 0, 0)
-  return store.bills.filter((b) => !b.paidAt && new Date(b.dueDate) < now)
+  return billBuckets.value.overdue
 })
 
 const upcomingBills = computed(() => {
-  const now = new Date()
-  now.setHours(0, 0, 0, 0)
-  return store.bills.filter((b) => !b.paidAt && new Date(b.dueDate) >= now)
+  return billBuckets.value.upcoming
 })
 
 const paidBills = computed(() => {
-  return store.bills.filter((b) => b.paidAt)
+  return billBuckets.value.paid
 })
 
 const currentBills = computed(() => {
