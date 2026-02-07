@@ -66,7 +66,8 @@ const validateField = (
 </script>
 
 <template>
-  <div class="mx-auto w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+  <div class="flex min-h-screen items-center justify-center px-6 py-16">
+    <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
     <div class="flex flex-col gap-2">
       <h2 class="text-2xl font-semibold">Create account</h2>
       <p class="text-sm text-slate-500">
@@ -144,5 +145,6 @@ const validateField = (
         Login
       </RouterLink>
     </p>
+    </div>
   </div>
 </template>
