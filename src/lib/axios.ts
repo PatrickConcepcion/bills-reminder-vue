@@ -14,12 +14,21 @@ type RetriableRequestConfig = InternalAxiosRequestConfig & {
   _retry?: boolean
 }
 
+const normalizeRequestPath = (requestUrl?: string) => {
+  const sanitizedUrl = requestUrl ?? ''
+  if (!sanitizedUrl) return ''
+
+  try {
+    return new URL(sanitizedUrl, import.meta.env.VITE_API_BASE_URL).pathname.replace(/\/+$/, '')
+  } catch {
+    return sanitizedUrl.replace(/[?#].*$/, '').replace(/\/+$/, '')
+  }
+}
+
 async function forceLogout() {
   try {
     await rawApi.post('/auth/logout')
-  } catch {
-    // no-op: we still redirect to login below
-  }
+  } catch {}
 
   if (window.location.pathname !== '/login') {
     window.location.assign('/login')
@@ -44,11 +53,11 @@ api.interceptors.response.use(
       return Promise.reject(error)
     }
 
-    const requestUrl = originalRequest.url ?? ''
-    const isLoginRequest = requestUrl.includes('/auth/login')
-    const isRegisterRequest = requestUrl.includes('/auth/register')
-    const isRefreshRequest = requestUrl.includes('/auth/refresh')
-    const isLogoutRequest = requestUrl.includes('/auth/logout')
+    const requestPath = normalizeRequestPath(originalRequest.url)
+    const isLoginRequest = requestPath === '/auth/login'
+    const isRegisterRequest = requestPath === '/auth/register'
+    const isRefreshRequest = requestPath === '/auth/refresh'
+    const isLogoutRequest = requestPath === '/auth/logout'
 
     if (isLoginRequest || isRegisterRequest) {
       return Promise.reject(error)
